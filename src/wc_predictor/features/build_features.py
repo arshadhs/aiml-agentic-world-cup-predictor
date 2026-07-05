@@ -5,6 +5,22 @@ Features Buildup
 import pandas as pd
 from wc_predictor.utils.paths import PROCESSED_DATA_DIR
 
+'''
+Build real pre-match features → train real model → predict future match
+
+home_form_last_5
+away_form_last_5
+home_avg_goals_scored_last_5
+away_avg_goals_scored_last_5
+home_avg_goals_conceded_last_5
+away_avg_goals_conceded_last_5
+home_matches_played_before
+away_matches_played_before
+neutral
+result
+'''
+
+
 def build_basic_features(df= pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
 
