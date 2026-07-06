@@ -26,36 +26,43 @@ FEATURE_COLUMNS = [
     "away_matches_played_before",
 ]
 
-def load_model_and_encoder():
+def load_model_and_encoder(model_name: str = "random_forest"):
     """
-    Load the trained model and label encoder from the models folder.
+    Load a trained model and its label encoder.
+
+    Example model_name values:
+    - random_forest
+    - xgboost
+    - logistic_regression
     """
 
-    model_path = MODELS_DIR / "prematch_model.pkl"
-    encoder_path = MODELS_DIR / "prematch_label_encoder.pkl"
+    # Build file names from the chosen model name
+    model_path = MODELS_DIR / f"{model_name}_model.pkl"
+    encoder_path = MODELS_DIR / f"{model_name}_label_encoder.pkl"
 
+    # Check if the model file exists
     if not model_path.exists():
         raise FileNotFoundError(
             f"Model not found: {model_path}\n"
-            "Run: python -m wc_predictor.models.train_prematch_model"
+            f"Train the model first before prediction."
         )
 
+    # Check if the label encoder exists
     if not encoder_path.exists():
         raise FileNotFoundError(
             f"Label encoder not found: {encoder_path}\n"
-            "Run: python -m wc_predictor.models.train_prematch_model"
+            f"Train the model first before prediction."
         )
 
-    # Load trained model
-    with open(model_path, "rb") as f:
-        model = pickle.load(f)
+    # Load model
+    with open(model_path, "rb") as file:
+        model = pickle.load(file)
 
-    # Load label encoder so we can convert numeric prediction back to text
-    with open(encoder_path, "rb") as f:
-        label_encoder = pickle.load(f)
+    # Load encoder
+    with open(encoder_path, "rb") as file:
+        label_encoder = pickle.load(file)
 
     return model, label_encoder
-
 
 def resolve_team_name(df: pd.DataFrame, team_name: str) -> str:
     """
@@ -172,7 +179,8 @@ def predict_match(
     home_team: str,
     away_team: str,
     neutral: int,
-    match_date=None
+    match_date=None,
+    model_name: str = "random_forest"
 ):
     """
     Predict result probabilities for one match.
@@ -193,7 +201,7 @@ def predict_match(
     away_team = resolve_team_name(df, away_team)
 
     # Load trained model and label encoder
-    model, label_encoder = load_model_and_encoder()
+    model, label_encoder = load_model_and_encoder(model_name=model_name)
 
     # Build features for this specific match
     X_match = build_match_features(
@@ -259,25 +267,28 @@ def main():
         help="Match date in YYYY-MM-DD format - (optional)"
     )
 
+    # Model choice
+    parser.add_argument(
+        "--model",
+        default="random_forest",
+        choices=["random_forest", "xgboost", "logistic_regression"],
+        help="Choose which trained model to use"
+    )
+
     args = parser.parse_args()
 
     predicted_result, probability_dict, features, home_team, away_team = predict_match(
         home_team=args.home,
         away_team=args.away,
         neutral=args.neutral,
-        match_date=args.date
+        match_date=args.date,
+        model_name=args.model
     )
 
     print()
     print(f"Match: {home_team} vs {away_team}")
+    print(f"Model used: {args.model}")
 
-    # Convert model label into user-friendly wording
-    if predicted_result == "HOME_WIN":
-        friendly_result = f"{args.home} win"
-    elif predicted_result == "AWAY_WIN":
-        friendly_result = f"{args.away} win"
-    else:
-        friendly_result = "Draw"
     # Convert HOME_WIN/AWAY_WIN/DRAW into readable wording
     friendly_prediction = format_result_label(
         label=predicted_result,

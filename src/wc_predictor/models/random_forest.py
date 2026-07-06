@@ -1,5 +1,5 @@
 '''
-Baseline Model
+Model based on Pre-match data
 '''
 
 import pandas as pd
@@ -12,13 +12,19 @@ from sklearn.metrics import accuracy_score, classification_report
 
 from wc_predictor.utils.paths import PROCESSED_DATA_DIR, MODELS_DIR
 
-def train_baseline_model():
-    df = pd.read_csv(PROCESSED_DATA_DIR / "features_basic.csv")
+def train_prematch_model():
+    df = pd.read_csv(PROCESSED_DATA_DIR / "features_prematch.csv")
 
     features = [
         "neutral",
-        "goal_difference",
-        "total_goals"
+        "home_form_last_5",
+        "away_form_last_5",
+        "home_avg_goals_scored_last_5",
+        "away_avg_goals_scored_last_5",
+        "home_avg_goals_conceded_last_5",
+        "away_avg_goals_conceded_last_5",
+        "home_matches_played_before",
+        "away_matches_played_before",
     ]
     target = "result"
 
@@ -37,25 +43,31 @@ def train_baseline_model():
     )
 
     model = RandomForestClassifier(
-        n_estimators = 100,
-        random_state = 42
+        n_estimators = 200,
+        random_state = 42,
+        max_depth=10
     )
 
     model.fit(X_train, y_train)
     y_pred = model.predict(X_test)
 
     print("Accuracy:", accuracy_score(y_test, y_pred))
-    print("Classifiation:\n", classification_report(y_test, y_pred, target_names=label_encoder.classes_))
+    print("Classifiation:\n", classification_report(
+        y_test,
+        y_pred,
+        target_names=label_encoder.classes_))
 
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
 
-    with open(MODELS_DIR / "baseline_model.pkl", "wb") as f:
+    # Save trained random_forest model
+    with open(MODELS_DIR / "random_forest_model.pkl", "wb") as f:
         pickle.dump(model, f)
 
-    with open(MODELS_DIR / "label_encoder.pkl", "wb") as f:
+    # Save label encoder
+    with open(MODELS_DIR / "random_forest_label_encoder.pkl", "wb") as f:
         pickle.dump(label_encoder, f)
 
-    print("Saved baseline model.")
+    print("Saved prematch model.")
 
 if __name__ == "__main__":
-    train_baseline_model()
+    train_prematch_model()

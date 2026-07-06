@@ -3,15 +3,18 @@ Predict multiple upcoming football fixtures.
 
 This script:
 1. Loads upcoming fixtures from data/raw/upcoming_fixtures.csv
-2. Uses the trained pre-match model
+2. Uses the selected trained model
 3. Predicts each match result
 4. Saves predictions to data/processed/fixture_predictions.csv
 """
+
+import argparse
 
 import pandas as pd
 
 from wc_predictor.models.predict_match import predict_match, format_result_label
 from wc_predictor.utils.paths import RAW_DATA_DIR, PROCESSED_DATA_DIR
+
 
 def get_confidence_label(max_probability: float) -> str:
     """
@@ -25,6 +28,7 @@ def get_confidence_label(max_probability: float) -> str:
         return "Medium"
 
     return "Low"
+
 
 def convert_neutral_value(value) -> int:
     """
@@ -53,7 +57,7 @@ def convert_neutral_value(value) -> int:
     raise ValueError(f"Invalid neutral value: {value}")
 
 
-def predict_fixtures() -> pd.DataFrame:
+def predict_fixtures(model_name: str = "random_forest") -> pd.DataFrame:
     """
     Predict results for all matches in upcoming_fixtures.csv.
     """
@@ -82,22 +86,33 @@ def predict_fixtures() -> pd.DataFrame:
         home_team = row["home_team"]
         away_team = row["away_team"]
 
+        # Skip fixtures where teams are not known yet
+        if str(home_team).strip().upper() == "TBD" or str(away_team).strip().upper() == "TBD":
+            #print(f"Skipping TBD fixture: {home_team} vs {away_team} on {match_date}")
+            continue
+            
+        # Skip fixtures where neutral value is missing
+        if pd.isna(row["neutral"]):
+            #print(f"Skipping fixture with missing neutral value: {home_team} vs {away_team} on {match_date}")
+            continue
+            
         # Convert TRUE/FALSE neutral value into 1/0
         neutral = convert_neutral_value(row["neutral"])
 
-        # Predict this match using your existing single-match predictor
+        # Predict this match using the selected model
         predicted_result, probability_dict, features, resolved_home, resolved_away = predict_match(
             home_team=home_team,
             away_team=away_team,
             neutral=neutral,
-            match_date=match_date
+            match_date=match_date,
+            model_name=model_name,
         )
 
         # Convert HOME_WIN / AWAY_WIN / DRAW into friendly wording
         friendly_prediction = format_result_label(
             label=predicted_result,
             home_team=resolved_home,
-            away_team=resolved_away
+            away_team=resolved_away,
         )
 
         # Get probabilities from the model output
@@ -109,7 +124,7 @@ def predict_fixtures() -> pd.DataFrame:
         max_probability = max(
             home_win_probability,
             draw_probability,
-            away_win_probability
+            away_win_probability,
         )
 
         # Convert probability into confidence label
@@ -126,12 +141,15 @@ def predict_fixtures() -> pd.DataFrame:
             "city": row.get("city", ""),
             "country": row.get("country", ""),
 
+            # Model used
+            "model_used": model_name,
+
             # Model input
             "neutral": neutral,
 
             # Model prediction
             "predicted_result": friendly_prediction,
-            "confidence": confidence,            
+            "confidence": confidence,
             "home_win_probability": round(home_win_probability, 4),
             "draw_probability": round(draw_probability, 4),
             "away_win_probability": round(away_win_probability, 4),
@@ -141,10 +159,27 @@ def predict_fixtures() -> pd.DataFrame:
     return pd.DataFrame(predictions)
 
 
-if __name__ == "__main__":
+def main() -> None:
+    """
+    Command line entry point.
+    """
 
-    # Predict all fixtures
-    predictions_df = predict_fixtures()
+    parser = argparse.ArgumentParser(
+        description="Predict multiple fixtures using a selected model."
+    )
+
+    # Choose which trained model to use
+    parser.add_argument(
+        "--model",
+        default="random_forest",
+        choices=["random_forest", "xgboost", "logistic_regression"],
+        help="Choose which trained model to use",
+    )
+
+    args = parser.parse_args()
+
+    # Predict all fixtures using the selected model
+    predictions_df = predict_fixtures(model_name=args.model)
 
     # Make sure processed data folder exists
     PROCESSED_DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -154,5 +189,10 @@ if __name__ == "__main__":
     predictions_df.to_csv(output_path, index=False)
 
     print(f"Saved fixture predictions to: {output_path}")
+    print(f"Model used: {args.model}")
     print()
     print(predictions_df.to_string(index=False))
+
+
+if __name__ == "__main__":
+    main()

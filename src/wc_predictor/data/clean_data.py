@@ -54,4 +54,4 @@ if __name__ == "__main__":
     clean_df.to_csv(output_path, index = False)
 
     print("Saved cleaned data to: {output_path}")
-    print(clean_df.head())
+    print(clean_df.tail())

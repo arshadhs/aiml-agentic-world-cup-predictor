@@ -1,5 +1,9 @@
 '''
-Model based on Pre-match data
+Baseline Model
+
+Note:
+This is an early learning baseline and may use score-derived features.
+The real prediction model is trained in train_random_forest_model.py.
 '''
 
 import pandas as pd
@@ -12,19 +16,13 @@ from sklearn.metrics import accuracy_score, classification_report
 
 from wc_predictor.utils.paths import PROCESSED_DATA_DIR, MODELS_DIR
 
-def train_prematch_model():
-    df = pd.read_csv(PROCESSED_DATA_DIR / "features_prematch.csv")
+def train_baseline_model():
+    df = pd.read_csv(PROCESSED_DATA_DIR / "features_basic.csv")
 
     features = [
         "neutral",
-        "home_form_last_5",
-        "away_form_last_5",
-        "home_avg_goals_scored_last_5",
-        "away_avg_goals_scored_last_5",
-        "home_avg_goals_conceded_last_5",
-        "away_avg_goals_conceded_last_5",
-        "home_matches_played_before",
-        "away_matches_played_before",
+        "goal_difference",
+        "total_goals"
     ]
     target = "result"
 
@@ -43,29 +41,25 @@ def train_prematch_model():
     )
 
     model = RandomForestClassifier(
-        n_estimators = 200,
-        random_state = 42,
-        max_depth=10
+        n_estimators = 100,
+        random_state = 42
     )
 
     model.fit(X_train, y_train)
     y_pred = model.predict(X_test)
 
     print("Accuracy:", accuracy_score(y_test, y_pred))
-    print("Classifiation:\n", classification_report(
-        y_test,
-        y_pred,
-        target_names=label_encoder.classes_))
+    print("Classifiation:\n", classification_report(y_test, y_pred, target_names=label_encoder.classes_))
 
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
 
-    with open(MODELS_DIR / "prematch_model.pkl", "wb") as f:
+    with open(MODELS_DIR / "baseline_model.pkl", "wb") as f:
         pickle.dump(model, f)
 
-    with open(MODELS_DIR / "prematch_label_encoder.pkl", "wb") as f:
+    with open(MODELS_DIR / "label_encoder.pkl", "wb") as f:
         pickle.dump(label_encoder, f)
 
-    print("Saved prematch model.")
+    print("Saved baseline model.")
 
 if __name__ == "__main__":
-    train_prematch_model()
+    train_baseline_model()

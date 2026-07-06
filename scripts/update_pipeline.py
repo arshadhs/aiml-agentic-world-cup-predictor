@@ -37,7 +37,8 @@ def main() -> None:
     run_command([sys.executable, "-m", "wc_predictor.features.build_prematch_features"])
 
     # Step 4: Retrain the real prediction model
-    run_command([sys.executable, "-m", "wc_predictor.models.train_prematch_model"])
+    # Train the Random Forest model
+    run_command([sys.executable, "-m", "wc_predictor.models.random_forest"])
 
     print()
     print("Pipeline update completed successfully.")
