@@ -13,6 +13,7 @@ import streamlit as st
 from wc_predictor.models.predict_match import predict_match, format_result_label
 from wc_predictor.utils.paths import PROCESSED_DATA_DIR
 
+
 def load_team_names() -> list[str]:
     """
     Load all team names from matches_cleaned.csv.
@@ -38,6 +39,34 @@ def load_team_names() -> list[str]:
 
     # Sort teams alphabetically
     return sorted(teams)
+
+
+def highlight_predicted_winner(row):
+    """
+    Highlight the team that matches the predicted result.
+    """
+
+    # Default style for all columns
+    styles = [""] * len(row)
+
+    home_team = row["Home Team"]
+    away_team = row["Away Team"]
+    predicted_result = row["Predicted Result"]
+
+    # Highlight home team if predicted result says home team will win
+    if predicted_result == f"{home_team} win":
+        styles[row.index.get_loc("Home Team")] = "font-weight: bold; background-color: #d4edda;"
+
+    # Highlight away team if predicted result says away team will win
+    elif predicted_result == f"{away_team} win":
+        styles[row.index.get_loc("Away Team")] = "font-weight: bold; background-color: #d4edda;"
+
+    # Highlight predicted result if draw
+    elif predicted_result == "Draw":
+        styles[row.index.get_loc("Predicted Result")] = "font-weight: bold; background-color: #fff3cd;"
+
+    return styles
+
 
 def get_confidence_label(max_probability: float) -> str:
     """
@@ -88,9 +117,37 @@ def load_fixture_predictions() -> pd.DataFrame:
     return df
 
 
+def format_date_with_suffix(date_value) -> str:
+    """
+    Format date like:
+    Sat, 26th July 2026
+    """
+
+    # Convert value to datetime
+    date = pd.to_datetime(date_value)
+
+    # Get day number
+    day = date.day
+
+    # Work out day suffix: st, nd, rd, th
+    if 11 <= day <= 13:
+        suffix = "th"
+    elif day % 10 == 1:
+        suffix = "st"
+    elif day % 10 == 2:
+        suffix = "nd"
+    elif day % 10 == 3:
+        suffix = "rd"
+    else:
+        suffix = "th"
+
+    # Format final date string
+    return date.strftime(f"%a, {day}{suffix} %B %Y")
+
+
 def show_fixture_predictions(df: pd.DataFrame) -> None:
     """
-    Show upcoming fixture predictions in a clean table.
+    Show upcoming fixture predictions in a clean user-friendly table.
     """
 
     st.subheader("Upcoming Fixture Predictions")
@@ -101,29 +158,69 @@ def show_fixture_predictions(df: pd.DataFrame) -> None:
     # Create a display-friendly copy
     display_df = df.copy()
 
-    # Convert probabilities to percentages
-    display_df["Home Win %"] = (display_df["home_win_probability"] * 100).round(1)
-    display_df["Draw %"] = (display_df["draw_probability"] * 100).round(1)
-    display_df["Away Win %"] = (display_df["away_win_probability"] * 100).round(1)
+    # Create formatted date column
+    display_df["Date"] = display_df["date"].apply(format_date_with_suffix)
 
-    # Select useful columns for dashboard
+    # Create location column from city and country
+    display_df["Location"] = (
+        display_df["city"].fillna("").astype(str)
+        + ", "
+        + display_df["country"].fillna("").astype(str)
+    )
+
+    # Clean up cases where city/country may be missing
+    display_df["Location"] = display_df["Location"].str.strip(", ")
+
+    # Convert probabilities to percentages
+    display_df["Home Win Probability"] = (
+        display_df["home_win_probability"] * 100
+    ).round(1).astype(str) + "%"
+
+    display_df["Draw Probability"] = (
+        display_df["draw_probability"] * 100
+    ).round(1).astype(str) + "%"
+
+    display_df["Away Win Probability"] = (
+        display_df["away_win_probability"] * 100
+    ).round(1).astype(str) + "%"
+
+    # Rename columns to user-friendly labels
+    display_df = display_df.rename(
+        columns={
+            "home_team": "Home Team",
+            "away_team": "Away Team",
+            "predicted_result": "Predicted Result",
+            "confidence": "Confidence",
+        }
+    )
+
+    # Select and order columns exactly how you want them shown
     display_df = display_df[
         [
-            "date",
-            "home_team",
-            "away_team",
-            "city",
-            "country",
-            "predicted_result",
-            "confidence",
-            "Home Win %",
-            "Draw %",
-            "Away Win %",
+            "Date",
+            "Home Team",
+            "Away Team",
+            "Predicted Result",
+            "Confidence",
+            "Home Win Probability",
+            "Draw Probability",
+            "Away Win Probability",
+            "Location",
         ]
     ]
 
-    # Show table
-    st.dataframe(display_df, use_container_width=True)
+    # Apply row-wise highlighting
+    styled_df = display_df.style.apply(
+        highlight_predicted_winner,
+        axis=1,
+    )
+
+    # Show styled table without index
+    st.dataframe(
+        styled_df,
+        use_container_width=True,
+        hide_index=True,
+    )
 
 
 def show_single_match_predictor() -> None:
