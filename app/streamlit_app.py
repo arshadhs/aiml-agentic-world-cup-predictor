@@ -380,19 +380,7 @@ def main() -> None:
             **first team win**, **draw**, or **second team win**.
             """
     )
-'''
-    st.sidebar.markdown("### About")
 
-    st.sidebar.markdown(
-        """
-        **AI World Cup Predictor**
-    
-        Built by **Arshad Siddiqui**
-    
-        [LinkedIn](https://www.linkedin.com/in/arshadsiddiqui/)
-        """
-    )
-'''    
     # Load batch predictions
     predictions_df = load_fixture_predictions()
 
