@@ -397,9 +397,7 @@ def main() -> None:
     st.markdown(
         """
         **AI World Cup Predictor**  
-        Built by **Arshad Siddiqui**
-    
-        [LinkedIn](https://www.linkedin.com/in/arshadsiddiqui/) |
+        Built by **Arshad Siddiqui** | [LinkedIn](https://www.linkedin.com/in/arshadsiddiqui/)
         """
     )
 
