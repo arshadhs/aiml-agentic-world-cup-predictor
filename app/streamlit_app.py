@@ -380,7 +380,7 @@ def main() -> None:
             **first team win**, **draw**, or **second team win**.
             """
     )
-
+'''
     st.sidebar.markdown("### About")
 
     st.sidebar.markdown(
@@ -392,7 +392,7 @@ def main() -> None:
         [LinkedIn](https://www.linkedin.com/in/arshadsiddiqui/)
         """
     )
-    
+'''    
     # Load batch predictions
     predictions_df = load_fixture_predictions()
 
@@ -404,6 +404,16 @@ def main() -> None:
     # Show single match predictor
     show_single_match_predictor()
 
+    st.markdown("---")
+    
+    st.markdown(
+        """
+        **AI World Cup Predictor**  
+        Built by **Arshad Siddiqui**
+    
+        [LinkedIn](https://www.linkedin.com/in/arshadsiddiqui/) |
+        """
+    )
 
 if __name__ == "__main__":
     main()
