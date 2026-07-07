@@ -13,6 +13,31 @@ import streamlit as st
 from wc_predictor.models.predict_match import predict_match, format_result_label
 from wc_predictor.utils.paths import PROCESSED_DATA_DIR
 
+def load_team_names() -> list[str]:
+    """
+    Load all team names from matches_cleaned.csv.
+
+    This gives the dashboard a dropdown list of valid teams.
+    """
+
+    # Path to cleaned historical match data
+    data_path = PROCESSED_DATA_DIR / "matches_cleaned.csv"
+
+    # If cleaned data is missing, return a small fallback list
+    if not data_path.exists():
+        return ["England", "France", "Brazil", "Norway", "Argentina", "Spain"]
+
+    # Load cleaned match data
+    df = pd.read_csv(data_path)
+
+    # Combine home and away team names
+    teams = pd.concat([
+        df["home_team"],
+        df["away_team"],
+    ]).dropna().unique()
+
+    # Sort teams alphabetically
+    return sorted(teams)
 
 def get_confidence_label(max_probability: float) -> str:
     """
@@ -108,14 +133,24 @@ def show_single_match_predictor() -> None:
 
     st.subheader("Single Match Predictor")
 
-    # Layout columns
+    # Load valid team names for dropdowns
+    teams = load_team_names()
+
     col1, col2 = st.columns(2)
 
     with col1:
-        home_team = st.text_input("First team", value="England")
+        home_team = st.selectbox(
+            "First team",
+            teams,
+            index=teams.index("England") if "England" in teams else 0,
+        )
 
     with col2:
-        away_team = st.text_input("Second team", value="France")
+        away_team = st.selectbox(
+            "Second team",
+            teams,
+            index=teams.index("France") if "France" in teams else 1,
+        )
 
     col3, col4 = st.columns(2)
 
@@ -124,6 +159,10 @@ def show_single_match_predictor() -> None:
 
     with col4:
         neutral = st.checkbox("Neutral venue", value=True)
+
+    if home_team == away_team:
+        st.warning("Please choose two different teams.")
+        return
 
     # Predict button
     if st.button("Predict Match"):
