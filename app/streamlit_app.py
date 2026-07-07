@@ -354,6 +354,33 @@ def main() -> None:
         "and machine learning."
     )
 
+    with st.expander("How the model works"):
+        st.markdown(
+            """
+            Data → Cleaning → Feature Engineering → Model Training → Single-Match Prediction → Batch Fixture Prediction
+    
+            I am using historical international football results dataset
+            for training the machine learning model.
+    
+            During feature engineering,
+            - the **model learns from many historical matches**,
+            - but **each individual prediction** is based on **pre-match features** calculated
+            from **recent team history**.
+    
+            For each fixture, the prediction uses features such as:
+    
+            - Recent form from the team's last **5 matches**
+            - Average goals scored in the last **5 matches**
+            - Average goals conceded in the last **5 matches**
+            - Number of previous matches played in the historical dataset
+            - Whether the match is played at a neutral venue
+      
+            The features are passed into a trained machine learning classifier,
+            currently **Random Forest**, which estimates the probability of each outcome:
+            **first team win**, **draw**, or **second team win**.
+            """
+    )
+    
     # Load batch predictions
     predictions_df = load_fixture_predictions()
 
