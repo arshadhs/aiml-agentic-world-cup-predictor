@@ -1,29 +1,78 @@
-'''
+"""
 Build real pre-match features.
 
 Historical results -> pre-match features -> real prediction model
 
 Only use information available before the match starts.
 Do NOT use home_score, away_score, goal_difference, or total_goals as model inputs.
-'''
+"""
 
 import pandas as pd
 
 from wc_predictor.utils.paths import PROCESSED_DATA_DIR
 
 
+def get_match_score(home_score: int, away_score: int) -> tuple[float, float]:
+    """
+    Convert the match result into Elo scores.
+
+    Home win = 1.0 for home, 0.0 for away
+    Draw     = 0.5 for both
+    Away win = 0.0 for home, 1.0 for away
+    """
+
+    if home_score > away_score:
+        return 1.0, 0.0
+
+    if home_score < away_score:
+        return 0.0, 1.0
+
+    return 0.5, 0.5
+
+
+def get_expected_score(team_elo: float, opponent_elo: float) -> float:
+    """
+    Calculate expected score using the Elo formula.
+
+    Higher rated teams are expected to win more often.
+    """
+
+    return 1 / (1 + 10 ** ((opponent_elo - team_elo) / 400))
+
+
+def update_elo(
+    team_elo: float,
+    opponent_elo: float,
+    actual_score: float,
+    k_factor: int = 20,
+) -> float:
+    """
+    Update one team's Elo rating after a match.
+
+    k_factor controls how quickly ratings change.
+    """
+
+    expected_score = get_expected_score(
+        team_elo=team_elo,
+        opponent_elo=opponent_elo,
+    )
+
+    return team_elo + k_factor * (actual_score - expected_score)
+
+
 def get_team_history(df: pd.DataFrame, team: str, match_date) -> pd.DataFrame:
-    '''
+    """
     Return all matches played by a team before a given match date.
+
     This prevents the model from using future information.
-    '''
+    """
 
     previous_matches = df[
         (
-            (df["home_team"] == team) |
-            (df["away_team"] == team)
-        ) &
-        (df["date"] < match_date)
+            (df["home_team"] == team)
+            | (df["away_team"] == team)
+        )
+        & (df["date"] < match_date)
     ].copy()
 
     # Sort by date so the latest matches are at the bottom
@@ -31,18 +80,18 @@ def get_team_history(df: pd.DataFrame, team: str, match_date) -> pd.DataFrame:
 
 
 def calculate_team_features(
-        df: pd.DataFrame,
-        team: str,
-        match_date,
-        last_n: int = 5
-    ) -> dict:
-    '''
+    df: pd.DataFrame,
+    team: str,
+    match_date,
+    last_n: int = 5,
+) -> dict:
+    """
     Calculate pre-match statistics for one team.
 
     Example:
     Before England vs Ghana, calculate England's form using only
     matches England played before that date.
-    '''
+    """
 
     # Get previous matches for this team
     history = get_team_history(df, team, match_date)
@@ -89,17 +138,19 @@ def calculate_team_features(
 
     return {
         "form_last_5": sum(points),
-        "avg_goals_scored_last_5": sum(goals_scored) / len(goals_scored),
-        "avg_goals_conceded_last_5": sum(goals_conceded) / len(goals_conceded),
+        "avg_goals_scored_last_5": round(sum(goals_scored) / len(goals_scored), 2),
+        "avg_goals_conceded_last_5": round(sum(goals_conceded) / len(goals_conceded), 2),
         "matches_played_before": len(history),
     }
 
 
 def build_prematch_features(df: pd.DataFrame) -> pd.DataFrame:
-    '''
+    """
     Build one row of pre-match features for every match.
+
     Each row uses only historical data before that match date.
-    '''
+    Elo is also stored before the match result is used.
+    """
 
     # Make a copy so we do not modify the original dataframe
     df = df.copy()
@@ -107,8 +158,11 @@ def build_prematch_features(df: pd.DataFrame) -> pd.DataFrame:
     # Convert date column to datetime so date comparisons work correctly
     df["date"] = pd.to_datetime(df["date"])
 
-    # Sort matches by date from oldest to newest
-    df = df.sort_values("date")
+    # Process matches in date order
+    df = df.sort_values("date").reset_index(drop=True)
+
+    # Start every team at 1500 Elo
+    team_elos = {}
 
     rows = []
 
@@ -120,36 +174,81 @@ def build_prematch_features(df: pd.DataFrame) -> pd.DataFrame:
         home_team = row["home_team"]
         away_team = row["away_team"]
 
+        # Get Elo ratings before this match
+        home_elo_before = team_elos.get(home_team, 1500)
+        away_elo_before = team_elos.get(away_team, 1500)
+
+        # Calculate Elo difference from home team's perspective
+        elo_difference = home_elo_before - away_elo_before
+
         # Calculate home team stats before this match
-        home_features = calculate_team_features(df, home_team, match_date)
+        home_features = calculate_team_features(
+            df=df,
+            team=home_team,
+            match_date=match_date,
+        )
 
         # Calculate away team stats before this match
-        away_features = calculate_team_features(df, away_team, match_date)
+        away_features = calculate_team_features(
+            df=df,
+            team=away_team,
+            match_date=match_date,
+        )
 
         # Add one row of features for this match
-        rows.append({
-            # Match information
-            "date": row["date"],
-            "home_team": row["home_team"],
-            "away_team": row["away_team"],
-            "tournament": row["tournament"],
-            "neutral": row["neutral"],
+        rows.append(
+            {
+                # Match information
+                "date": row["date"],
+                "home_team": home_team,
+                "away_team": away_team,
+                "tournament": row["tournament"],
+                "neutral": int(row["neutral"]),
 
-            # Home team pre-match features
-            "home_form_last_5": home_features["form_last_5"],
-            "home_avg_goals_scored_last_5": home_features["avg_goals_scored_last_5"],
-            "home_avg_goals_conceded_last_5": home_features["avg_goals_conceded_last_5"],
-            "home_matches_played_before": home_features["matches_played_before"],
+                # Home team pre-match features
+                "home_form_last_5": home_features["form_last_5"],
+                "home_avg_goals_scored_last_5": home_features["avg_goals_scored_last_5"],
+                "home_avg_goals_conceded_last_5": home_features["avg_goals_conceded_last_5"],
+                "home_matches_played_before": home_features["matches_played_before"],
 
-            # Away team pre-match features
-            "away_form_last_5": away_features["form_last_5"],
-            "away_avg_goals_scored_last_5": away_features["avg_goals_scored_last_5"],
-            "away_avg_goals_conceded_last_5": away_features["avg_goals_conceded_last_5"],
-            "away_matches_played_before": away_features["matches_played_before"],
+                # Away team pre-match features
+                "away_form_last_5": away_features["form_last_5"],
+                "away_avg_goals_scored_last_5": away_features["avg_goals_scored_last_5"],
+                "away_avg_goals_conceded_last_5": away_features["avg_goals_conceded_last_5"],
+                "away_matches_played_before": away_features["matches_played_before"],
 
-            # Target label the model will learn to predict
-            "result": row["result"],
-        })
+                # Elo rating features before this match
+                "home_elo_before": round(home_elo_before, 2),
+                "away_elo_before": round(away_elo_before, 2),
+                "elo_difference": round(elo_difference, 2),
+
+                # Target label the model will learn to predict
+                "result": row["result"],
+            }
+        )
+
+        # Now update Elo after saving the feature row.
+        # This prevents data leakage from the current match.
+        home_actual_score, away_actual_score = get_match_score(
+            home_score=row["home_score"],
+            away_score=row["away_score"],
+        )
+
+        new_home_elo = update_elo(
+            team_elo=home_elo_before,
+            opponent_elo=away_elo_before,
+            actual_score=home_actual_score,
+        )
+
+        new_away_elo = update_elo(
+            team_elo=away_elo_before,
+            opponent_elo=home_elo_before,
+            actual_score=away_actual_score,
+        )
+
+        # Store updated ratings for future matches
+        team_elos[home_team] = new_home_elo
+        team_elos[away_team] = new_away_elo
 
     # Convert list of dictionaries into a dataframe
     return pd.DataFrame(rows)
@@ -169,5 +268,5 @@ if __name__ == "__main__":
     features_df.to_csv(output_path, index=False)
 
     print(f"Saved pre-match features to: {output_path}")
-    print(features_df.head())
+    print(features_df.tail())
     print(features_df.info())

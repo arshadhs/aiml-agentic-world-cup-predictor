@@ -24,7 +24,101 @@ FEATURE_COLUMNS = [
     "away_avg_goals_conceded_last_5",
     "home_matches_played_before",
     "away_matches_played_before",
+
+    # Elo rating features
+    "home_elo_before",
+    "away_elo_before",
+    "elo_difference",
 ]
+
+def get_match_score(home_score: int, away_score: int) -> tuple[float, float]:
+    """
+    Convert match score into Elo result values.
+
+    Home win = 1.0 for home team, 0.0 for away team
+    Draw     = 0.5 for both teams
+    Away win = 0.0 for home team, 1.0 for away team
+    """
+
+    if home_score > away_score:
+        return 1.0, 0.0
+
+    if home_score < away_score:
+        return 0.0, 1.0
+
+    return 0.5, 0.5
+
+
+def get_expected_score(team_elo: float, opponent_elo: float) -> float:
+    """
+    Calculate the expected result for one team using Elo formula.
+
+    A stronger team has a higher expected score.
+    """
+
+    return 1 / (1 + 10 ** ((opponent_elo - team_elo) / 400))
+
+
+def update_elo(
+    team_elo: float,
+    opponent_elo: float,
+    actual_score: float,
+    k_factor: int = 20,
+) -> float:
+    """
+    Update one team's Elo rating after a match.
+
+    k_factor controls how quickly ratings change.
+    """
+
+    expected_score = get_expected_score(
+        team_elo=team_elo,
+        opponent_elo=opponent_elo,
+    )
+
+    return team_elo + k_factor * (actual_score - expected_score)
+
+
+def calculate_current_elos(df: pd.DataFrame, match_date) -> dict:
+    """
+    Calculate latest Elo ratings using all matches before the prediction date.
+    """
+
+    # Keep only matches before the prediction date
+    historical_df = df[df["date"] < match_date].copy()
+
+    # Sort matches in correct order
+    historical_df = historical_df.sort_values("date")
+
+    # Start with empty Elo dictionary
+    team_elos = {}
+
+    for _, row in historical_df.iterrows():
+        home_team = row["home_team"]
+        away_team = row["away_team"]
+
+        home_elo_before = team_elos.get(home_team, 1500)
+        away_elo_before = team_elos.get(away_team, 1500)
+
+        home_actual_score, away_actual_score = get_match_score(
+            row["home_score"],
+            row["away_score"],
+        )
+
+        team_elos[home_team] = update_elo(
+            home_elo_before,
+            away_elo_before,
+            home_actual_score,
+        )
+
+        team_elos[away_team] = update_elo(
+            away_elo_before,
+            home_elo_before,
+            away_actual_score,
+        )
+
+    return team_elos
+
 
 def load_model_and_encoder(model_name: str = "random_forest"):
     """
@@ -135,6 +229,20 @@ def build_match_features(
         match_date=match_date
     )
 
+    # Calculate latest Elo ratings using only matches before this prediction date
+    team_elos = calculate_current_elos(
+        df=df,
+        match_date=match_date,
+    )
+
+    # Get Elo ratings for both teams
+    # If a team has no history, default rating is 1500
+    home_elo_before = team_elos.get(home_team, 1500)
+    away_elo_before = team_elos.get(away_team, 1500)
+
+    # Calculate Elo difference from home team's perspective
+    elo_difference = home_elo_before - away_elo_before
+
     # Create one prediction row
     match_features = {
         "neutral": int(neutral),
@@ -150,6 +258,11 @@ def build_match_features(
 
         "home_matches_played_before": home_features["matches_played_before"],
         "away_matches_played_before": away_features["matches_played_before"],
+
+        # Elo rating features
+        "home_elo_before": home_elo_before,
+        "away_elo_before": away_elo_before,
+        "elo_difference": elo_difference,
     }
 
     # Convert dictionary into a dataframe because sklearn expects tabular input
@@ -329,6 +442,11 @@ def main():
         "away_avg_goals_conceded_last_5": f"{away_team} avg goals conceded last 5",
         "home_matches_played_before": f"{home_team} matches played before",
         "away_matches_played_before": f"{away_team} matches played before",
+
+        # Friendly labels for Elo features
+        "home_elo_before": f"{home_team} Elo rating before match",
+        "away_elo_before": f"{away_team} Elo rating before match",
+        "elo_difference": "Elo difference",
     }
 
     # Print each feature on a separate line

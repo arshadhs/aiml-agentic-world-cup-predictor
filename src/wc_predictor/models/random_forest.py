@@ -25,11 +25,20 @@ def train_prematch_model():
         "away_avg_goals_conceded_last_5",
         "home_matches_played_before",
         "away_matches_played_before",
+
+        # Elo rating features
+        "home_elo_before",
+        "away_elo_before",
+        "elo_difference",
     ]
     target = "result"
 
     x = df[features]
     y = df[target]
+    
+    # Show which features are being used for training
+    print("Training features:")
+    print(x.columns.tolist())
 
     label_encoder = LabelEncoder()
     y_encoded = label_encoder.fit_transform(y)
@@ -49,6 +58,10 @@ def train_prematch_model():
     )
 
     model.fit(X_train, y_train)
+    # Confirm which feature names were stored inside the trained model
+    print("Model trained with features:")
+    print(model.feature_names_in_)
+    
     y_pred = model.predict(X_test)
 
     print("Accuracy:", accuracy_score(y_test, y_pred))
@@ -60,14 +73,15 @@ def train_prematch_model():
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
 
     # Save trained random_forest model
-    with open(MODELS_DIR / "random_forest_model.pkl", "wb") as f:
-        pickle.dump(model, f)
+    model_path = MODELS_DIR / "random_forest_model.pkl"
+    with open(model_path, "wb") as file:
+        pickle.dump(model, file)
 
     # Save label encoder
-    with open(MODELS_DIR / "random_forest_label_encoder.pkl", "wb") as f:
-        pickle.dump(label_encoder, f)
+    encoder_path = MODELS_DIR / "random_forest_label_encoder.pkl"
+    with open(encoder_path, "wb") as file:
+        pickle.dump(label_encoder, file)
 
-    print("Saved prematch model.")
 
 if __name__ == "__main__":
     train_prematch_model()

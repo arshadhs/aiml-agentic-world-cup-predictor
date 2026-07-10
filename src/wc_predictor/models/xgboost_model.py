@@ -23,6 +23,11 @@ FEATURE_COLUMNS = [
     "away_avg_goals_conceded_last_5",
     "home_matches_played_before",
     "away_matches_played_before",
+
+    # Elo rating features
+    "home_elo_before",
+    "away_elo_before",
+    "elo_difference",
 ]
 
 def train_xgboost_model() -> None:
