@@ -57,7 +57,10 @@ def convert_neutral_value(value) -> int:
     raise ValueError(f"Invalid neutral value: {value}")
 
 
-def predict_fixtures(model_name: str = "random_forest") -> pd.DataFrame:
+def predict_fixtures(
+        model_name: str = "random_forest",
+        verbose: bool = True,
+    ) -> pd.DataFrame:
     """
     Predict results for all matches in upcoming_fixtures.csv.
     """
@@ -88,12 +91,17 @@ def predict_fixtures(model_name: str = "random_forest") -> pd.DataFrame:
 
         # Skip fixtures where teams are not known yet
         if str(home_team).strip().upper() == "TBD" or str(away_team).strip().upper() == "TBD":
-            print(f"Skipping TBD fixture: {home_team} vs {away_team} on {match_date}")
+            if verbose:
+                print(f"Skipping TBD fixture: {home_team} vs {away_team} on {match_date}")
             continue
             
         # Skip fixtures where neutral value is missing
         if pd.isna(row["neutral"]):
-            print(f"Skipping fixture with missing neutral value: {home_team} vs {away_team} on {match_date}")
+            if verbose:
+                print(
+                    f"Skipping fixture with missing neutral value: "
+                    f"{home_team} vs {away_team} on {match_date}"
+                )
             continue
             
         # Convert TRUE/FALSE neutral value into 1/0

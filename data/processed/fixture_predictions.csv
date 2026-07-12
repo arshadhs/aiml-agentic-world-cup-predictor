@@ -1,4 +1,3 @@
 date,home_team,away_team,tournament,city,country,model_used,neutral,predicted_result,confidence,home_win_probability,draw_probability,away_win_probability
-2026-07-10,Spain,Belgium,FIFA World Cup,Los Angeles,United States,random_forest,1,Spain win,Medium,0.4818,0.2556,0.2625
-2026-07-11,Norway,England,FIFA World Cup,Mexico City,Mexico,random_forest,0,England win,Medium,0.2263,0.2639,0.5098
-2026-07-12,Argentina,Switzerland,FIFA World Cup,Kansas,United States,random_forest,0,Argentina win,Medium,0.5823,0.2679,0.1498
+2026-07-14,France,Spain,FIFA World Cup,Dallas,United States,random_forest,0,Spain win,Low,0.2931,0.3443,0.3626
+2026-07-15,England,Argentina,FIFA World Cup,Atlanta,United States,random_forest,0,Argentina win,Low,0.2652,0.3295,0.4054
